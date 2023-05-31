@@ -1,6 +1,7 @@
 from model.Vaccine import Vaccine
 from model.Caregiver import Caregiver
 from model.Patient import Patient
+from model.Appointment import Appointment
 from util.Util import Util
 from db.ConnectionManager import ConnectionManager
 import pymssql
@@ -13,8 +14,10 @@ Note: it is always true that at most one of currentCaregiver and currentPatient 
         since only one user can be logged-in at a time
 '''
 current_patient = None
+current_patient_name = ""
 current_caregiver = None
-appt_id_count = 1
+current_caregiver_name = ""
+appt_id = 0
 
 
 def create_patient(tokens):
@@ -46,7 +49,7 @@ def create_patient(tokens):
     except pymssql.Error as e:
         print("Failed to create user.")
         print("Db-Error:", e)
-        quit()
+        return
     except Exception as e:
         print("Failed to create user.")
         print(e)
@@ -80,7 +83,7 @@ def create_caregiver(tokens):
     except pymssql.Error as e:
         print("Failed to create user.")
         print("Db-Error:", e)
-        quit()
+        return
     except Exception as e:
         print("Failed to create user.")
         print(e)
@@ -96,13 +99,15 @@ def username_exists_patient(username):
     try:
         cursor = conn.cursor(as_dict=True)
         cursor.execute(select_username, username)
-        # returns false if the cursor is not before the first record or if there are no rows in the ResultSet.
-        for row in cursor:
-            return row['username'] is not None
+        row = cursor.fetchone()
+        if row is None:
+            return False
+        else:
+            return True
     except pymssql.Error as e:
         print("Error occurred when checking username")
         print("Db-Error:", e)
-        quit()
+        return
     except Exception as e:
         print("Error occurred when checking username")
         print("Error:", e)
@@ -119,13 +124,15 @@ def username_exists_caregiver(username):
     try:
         cursor = conn.cursor(as_dict=True)
         cursor.execute(select_username, username)
-        #  returns false if the cursor is not before the first record or if there are no rows in the ResultSet.
-        for row in cursor:
-            return row['username'] is not None
+        row = cursor.fetchone()
+        if row is None:
+            return False
+        else:
+            return True
     except pymssql.Error as e:
         print("Error occurred when checking username")
         print("Db-Error:", e)
-        quit()
+        return
     except Exception as e:
         print("Error occurred when checking username")
         print("Error:", e)
@@ -141,7 +148,9 @@ def login_patient(tokens):
     # login_patient <username> <password>
     # check 1: if someone's already logged-in, they need to log out first
     global current_patient
-    if current_patient is not None or current_patient is not None:
+    global current_patient_name
+
+    if current_patient is not None or current_caregiver is not None:
         print("User already logged in.")
         return
 
@@ -159,7 +168,7 @@ def login_patient(tokens):
     except pymssql.Error as e:
         print("Login failed.")
         print("Db-Error:", e)
-        quit()
+        return
     except Exception as e:
         print("Login failed.")
         print("Error:", e)
@@ -171,12 +180,15 @@ def login_patient(tokens):
     else:
         print("Logged in as: " + username)
         current_patient = patient
+        current_patient_name = username
 
 
 def login_caregiver(tokens):
     # login_caregiver <username> <password>
     # check 1: if someone's already logged-in, they need to log out first
     global current_caregiver
+    global current_caregiver_name
+
     if current_caregiver is not None or current_patient is not None:
         print("User already logged in.")
         return
@@ -195,7 +207,7 @@ def login_caregiver(tokens):
     except pymssql.Error as e:
         print("Login failed.")
         print("Db-Error:", e)
-        quit()
+        return
     except Exception as e:
         print("Login failed.")
         print("Error:", e)
@@ -207,6 +219,7 @@ def login_caregiver(tokens):
     else:
         print("Logged in as: " + username)
         current_caregiver = caregiver
+        current_caregiver_name = username
 
 
 def search_caregiver_schedule(tokens):
@@ -214,7 +227,31 @@ def search_caregiver_schedule(tokens):
     TODO: Part 2
     """
     # search_caregiver_schedule <date>
-    pass
+    if len(tokens) != 2:
+        print("Please try again!")
+        return
+    
+    if current_patient is None and current_caregiver is None:
+        print("Please login first!")
+        return
+    
+    date = tokens[1]
+    date_tokens = date.split("-")   # assume input is hyphenated in the format mm-dd-yyyy
+    month = int(date_tokens[0])
+    day = int(date_tokens[1])
+    year = int(date_tokens[2])
+
+    try:
+        d = datetime.datetime(year, month, day)
+        Appointment().search_schedule(d)
+    except pymssql.Error as e:
+        print("Error occurred when searching caregivers' availabilities")
+        print("Db-Error:", e)
+        return
+    except Exception as e:
+        print("Error occurred when searching caregivers' availabilities")
+        print("Error:", e)
+        return        
 
 
 def reserve(tokens):
@@ -222,7 +259,58 @@ def reserve(tokens):
     TODO: Part 2
     """
     # reserve <date> <vaccine>
-    pass
+    global appt_id
+
+    if len(tokens) != 3:
+        print("Please try again!")
+        return
+
+    if current_patient is None and current_caregiver is None:
+        print("Please login first!")
+        return
+    elif current_patient is None and current_caregiver is not None:
+        print("Please login as a patient!")
+        return
+
+    date = tokens[1]
+    vaccine_name = tokens[2]
+
+    # assume input is hyphenated in the format mm-dd-yyyy
+    date_tokens = date.split("-")
+    month = int(date_tokens[0])
+    day = int(date_tokens[1])
+    year = int(date_tokens[2])
+
+    try:
+        d = datetime.datetime(year, month, day)
+        appt = Appointment()
+        # first check if the <vaccine> is still available on <date>
+        avail_caregiver, avail_dose = appt.check_availability(d, vaccine_name)
+        # make an appointment if <vaccine> is available
+        # 1. insert an appt into database  
+        # 2. decrease_available_doses() 
+        # 3. update caregiver's availability
+        if avail_caregiver is not None and avail_dose is not None:
+            # appt_id += 1
+            appt.save_to_db(d, vaccine_name, avail_caregiver, current_patient_name)
+            Vaccine(vaccine_name, avail_dose).decrease_available_doses(1)
+            appt.update_availability(d, avail_caregiver)
+        # else, cannot make an appointment
+        else:
+            print("Cannot reserve. Please try again!")
+            return
+    except pymssql.Error as e:
+        print("Reserve Failed")
+        print("Db-Error:", e)
+        return
+    except ValueError:
+        print("Please enter a valid date!")
+        return
+    except Exception as e:
+        print("Error occurred when making reservation")
+        print("Error:", e)
+        return
+    print(f"Reservation made!")
 
 
 def upload_availability(tokens):
@@ -250,7 +338,7 @@ def upload_availability(tokens):
     except pymssql.Error as e:
         print("Upload Availability Failed")
         print("Db-Error:", e)
-        quit()
+        return
     except ValueError:
         print("Please enter a valid date!")
         return
@@ -289,7 +377,7 @@ def add_doses(tokens):
     except pymssql.Error as e:
         print("Error occurred when adding doses")
         print("Db-Error:", e)
-        quit()
+        return
     except Exception as e:
         print("Error occurred when adding doses")
         print("Error:", e)
@@ -304,7 +392,7 @@ def add_doses(tokens):
         except pymssql.Error as e:
             print("Error occurred when adding doses")
             print("Db-Error:", e)
-            quit()
+            return
         except Exception as e:
             print("Error occurred when adding doses")
             print("Error:", e)
@@ -316,7 +404,7 @@ def add_doses(tokens):
         except pymssql.Error as e:
             print("Error occurred when adding doses")
             print("Db-Error:", e)
-            quit()
+            return
         except Exception as e:
             print("Error occurred when adding doses")
             print("Error:", e)
@@ -328,18 +416,57 @@ def show_appointments(tokens):
     '''
     TODO: Part 2
     '''
-    pass
+    if len(tokens) != 1:
+        print("Please try again!")
+        return
+    
+    if current_patient is None and current_caregiver is None:
+        print("Please login first!")
+        return
+    elif current_patient is not None and current_caregiver is None:
+        user_flag = "patient"
+        username = current_patient_name
+    elif current_patient is None and current_caregiver is not None:
+        user_flag = "caregiver"
+        username = current_caregiver_name
+
+    try:
+        Appointment().show(user_flag, username)
+    except pymssql.Error as e:
+            print("Error occurred when showing appointments")
+            print("Db-Error:", e)
+            return
+    except Exception as e:
+            print("Error occurred when showing appointments")
+            print("Error:", e)
+            return
 
 
 def logout(tokens):
     """
     TODO: Part 2
     """
-    pass
+    global current_patient
+    global current_patient_name
+    global current_caregiver
+    global current_caregiver_name
+
+    if len(tokens) != 1:
+        print("Please try again!")
+        return
+    if current_patient is None and current_caregiver is None:
+        print("Please login first.")
+    elif current_patient is not None and current_caregiver is None:
+        current_patient = None
+        current_patient_name = ""
+        print("Successfully logged out!")
+    elif current_patient is None and current_caregiver is not None:
+        current_caregiver = None
+        current_caregiver_name = ""
+        print("Successfully logged out!")
 
 
-def start():
-    stop = False
+def menu():
     print()
     print(" *** Please enter one of the following commands *** ")
     print("> create_patient <username> <password>")  # //TODO: implement create_patient (Part 1)
@@ -355,6 +482,12 @@ def start():
     print("> logout")  # // TODO: implement logout (Part 2)
     print("> quit")
     print()
+
+
+def start():
+    stop = False
+    menu()
+
     while not stop:
         response = ""
         print("> ", end='')
@@ -373,31 +506,43 @@ def start():
         operation = tokens[0]
         if operation == "create_patient":
             create_patient(tokens)
+            menu()
         elif operation == "create_caregiver":
             create_caregiver(tokens)
+            menu()
         elif operation == "login_patient":
             login_patient(tokens)
+            menu()
         elif operation == "login_caregiver":
             login_caregiver(tokens)
+            menu()
         elif operation == "search_caregiver_schedule":
             search_caregiver_schedule(tokens)
+            menu()
         elif operation == "reserve":
             reserve(tokens)
+            menu()
         elif operation == "upload_availability":
             upload_availability(tokens)
+            menu()
         elif operation == cancel:
             cancel(tokens)
+            menu()
         elif operation == "add_doses":
             add_doses(tokens)
+            menu()
         elif operation == "show_appointments":
             show_appointments(tokens)
+            menu()
         elif operation == "logout":
             logout(tokens)
+            menu()
         elif operation == "quit":
             print("Bye!")
             stop = True
         else:
             print("Invalid operation name!")
+            menu()
 
 
 if __name__ == "__main__":

@@ -63,7 +63,7 @@ class Vaccine:
         conn = cm.create_connection()
         cursor = conn.cursor()
 
-        update_vaccine_availability = "UPDATE vaccines SET doses = %d WHERE name = %s"
+        update_vaccine_availability = "UPDATE Vaccines SET doses = %d WHERE name = %s"
         try:
             cursor.execute(update_vaccine_availability, (self.available_doses, self.vaccine_name))
             # you must call commit() to persist your data if you don't set autocommit to True
@@ -84,10 +84,9 @@ class Vaccine:
         conn = cm.create_connection()
         cursor = conn.cursor()
 
-        update_vaccine_availability = "UPDATE vaccines SET doses = %d WHERE name = %s"
+        update_vaccine_availability = "UPDATE Vaccines SET doses = %d WHERE name = %s"
         try:
             cursor.execute(update_vaccine_availability, (self.available_doses, self.vaccine_name))
-            # you must call commit() to persist your data if you don't set autocommit to True
             conn.commit()
         except pymssql.Error:
             # print("Error occurred when updating vaccine availability")
