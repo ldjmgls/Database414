@@ -17,7 +17,6 @@ current_patient = None
 current_patient_name = ""
 current_caregiver = None
 current_caregiver_name = ""
-appt_id = 0
 
 
 def create_patient(tokens):
@@ -284,18 +283,17 @@ def reserve(tokens):
     try:
         d = datetime.datetime(year, month, day)
         appt = Appointment()
-        # first check if the <vaccine> is still available on <date>
+        # First check if the <vaccine> is still available on <date>
         avail_caregiver, avail_dose = appt.check_availability(d, vaccine_name)
-        # make an appointment if <vaccine> is available
+        # Make an appointment if <vaccine> is available
         # 1. insert an appt into database  
         # 2. decrease_available_doses() 
         # 3. update caregiver's availability
         if avail_caregiver is not None and avail_dose is not None:
-            # appt_id += 1
             appt.save_to_db(d, vaccine_name, avail_caregiver, current_patient_name)
             Vaccine(vaccine_name, avail_dose).decrease_available_doses(1)
             appt.update_availability(d, avail_caregiver)
-        # else, cannot make an appointment
+        # Else, cannot make an appointment
         else:
             print("Cannot reserve. Please try again!")
             return
@@ -469,17 +467,17 @@ def logout(tokens):
 def menu():
     print()
     print(" *** Please enter one of the following commands *** ")
-    print("> create_patient <username> <password>")  # //TODO: implement create_patient (Part 1)
+    print("> create_patient <username> <password>")     # TODO: implement create_patient (Part 1)
     print("> create_caregiver <username> <password>")
-    print("> login_patient <username> <password>")  # // TODO: implement login_patient (Part 1)
+    print("> login_patient <username> <password>")      # TODO: implement login_patient (Part 1)
     print("> login_caregiver <username> <password>")
-    print("> search_caregiver_schedule <date>")  # // TODO: implement search_caregiver_schedule (Part 2)
-    print("> reserve <date> <vaccine>")  # // TODO: implement reserve (Part 2)
+    print("> search_caregiver_schedule <date>")         # TODO: implement search_caregiver_schedule (Part 2)
+    print("> reserve <date> <vaccine>")                 # TODO: implement reserve (Part 2)
     print("> upload_availability <date>")
-    print("> cancel <appointment_id>")  # // TODO: implement cancel (extra credit)
+    print("> cancel <appointment_id>")                  # TODO: implement cancel (extra credit)
     print("> add_doses <vaccine> <number>")
-    print("> show_appointments")  # // TODO: implement show_appointments (Part 2)
-    print("> logout")  # // TODO: implement logout (Part 2)
+    print("> show_appointments")                        # TODO: implement show_appointments (Part 2)
+    print("> logout")                                   # TODO: implement logout (Part 2)
     print("> quit")
     print()
 

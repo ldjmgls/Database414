@@ -7,8 +7,6 @@ import pymssql
 class Appointment:
     def __init__(self):
         pass
-        # self.date = date
-        # self.vaccine = vaccine
 
     def search_schedule(self, date):
         cm = ConnectionManager()
@@ -59,12 +57,10 @@ class Appointment:
 
             cursor.execute(get_doses, vaccine)
             row = cursor.fetchone()
-            # vaccine name misspelled
-            if row is None:
+            if row is None:     # vaccine name misspelled or not in database
                 print("No such vaccine is available.")
                 return None, None
-            # vaccine doses = 0
-            else:
+            else:               # vaccine doses = 0
                 if row[0] == 0:
                     print("Not enough available doses.")
                     return None, None
