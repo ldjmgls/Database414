@@ -17,7 +17,6 @@ CREATE TABLE Vaccines (
     PRIMARY KEY (name)
 );
 
--- Newly created
 CREATE TABLE Patients (
     username VARCHAR(255),
     salt BINARY(16),
@@ -26,16 +25,10 @@ CREATE TABLE Patients (
 );
 
 CREATE TABLE Appointments (
-    id INT,
+    id INT IDENTITY(1, 1),
     time date,
     vaccine_name VARCHAR(255),
     cname VARCHAR(255) REFERENCES Caregivers(username),
     pname VARCHAR(255) REFERENCES Patients(username),
     PRIMARY KEY (id)
 );
-
-CREATE TABLE AddDoses (
-    cname VARCHAR(255) REFERENCES Caregivers(username),
-    vname VARCHAR(255) REFERENCES Vaccines(name),
-    PRIMARY KEY (cname, vname)
-)
